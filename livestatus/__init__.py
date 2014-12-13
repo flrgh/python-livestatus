@@ -160,10 +160,20 @@ class QueryResult(object):
     def dicts(self):
         return self.parse_data(format='dicts')
 
+    @property
+    def errors(self):
+        errors = {}
+        for monitor in self.results.keys():
+            if self.results[monitor]['error'] is not None:
+                errors[monitor] = self.results[monitor]['error']
+        return errors
+
     def parse_data(self, format='dicts'):
         results = []
         for monitor in self.results.keys():
             data = self.results[monitor]['data']
+            if data is None:
+                continue
             data = data.strip('\n ')
             rows = data.split('\n')
             for row in rows:
@@ -211,16 +221,10 @@ def monitor_worker(mon_queue, conn):
         error = None
         try:
             data = monitor.run_query(query.query_text)
-            #for row in results.split('\n'):
-            #    if row == '':
-            #        # Ignore empty rows
-            #        continue
-            #    result = [monitor] + row.split(';')
-            #    # Replace empty strings with None
-            #    result = map(lambda x: None if x == "" else x, result)
-            #    conn.send(result)
+            if data.strip('\n ') == '':
+                data = None
+                error = '{} did not return any data'.format(monitor.name)
         except Exception as e:
-            print e
             error = e
         finally:
             conn.send((monitor.name, data, error))
