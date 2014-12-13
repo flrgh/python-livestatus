@@ -88,17 +88,18 @@ class MonitorNode(object):
 
 class Query(object):
 
-    def __init__(self, table, columns, filters=[]):
+    def __init__(self, table, columns, ls_filters=[], post_filters=[]):
         self.table   = table
         self.columns = columns
-        self.filters = filters
+        self.ls_filters = ls_filters
+        self.post_filters = post_filters
 
 
     @property
     def query_text(self):
         return Query.build(self.table,
                            self.columns,
-                           self.filters
+                           self.ls_filters
                            )
 
     @staticmethod
@@ -162,14 +163,23 @@ class QueryResult(object):
             rows = data.split('\n')
             for row in rows:
                 if format == 'dicts':
-                    row_dict = dict(zip(self.query.columns, row.split(';')))
+                    row_dict = dict(zip(
+                                        self.query.columns,
+                                        self.apply_filters(row.split(';'))
+                                        ))
                     row_dict['monitor'] = monitor
                     results.append(row_dict)
                 elif format == 'lists':
                     row_list = [monitor]
-                    row_list += row.split(';')
+                    row_list += self.apply_filters(row.split(';'))
                     results.append(row_list)
         return results
+
+
+    def apply_filters(self, result_list):
+        for f in self.query.post_filters:
+            result_list = map(f, result_list)
+        return result_list
 
     def __len__(self):
         return len(self.lists)

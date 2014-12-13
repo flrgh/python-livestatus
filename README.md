@@ -14,7 +14,7 @@ A Python library for the Livestatus API
 >>> 
 >>> query = Query(table='some-table',
 >>>               columns=['col1', 'col2','col3'],
->>>               filters=['col1 != 0']
+>>>               ls_filters=['col1 != 0']
 >>>              )
 >>> 
 >>> result_set = lc.run(query)
@@ -36,4 +36,25 @@ A Python library for the Livestatus API
         'col3'   : 'bar'
     }
 ]
+```
+
+Basic callable filters can be registered on a Query object, which will be applied after querying data
+
+```
+>>> from livestatus.filters import empty_to_nonetype, detect_numbers
+>>>
+>>> query = Query(table='some-table',
+>>>               columns=['col1', 'col2','col3'],
+>>>               ls_filters=['col1 != 0']
+>>>              )
+>>> 
+>>> result_set = lc.run(query)
+>>> 
+>>> print result_set.lists
+[['my-monitor01', '1', 'val1', 'val2'], ['my-monitor01', '1', '', 'bar']]
+>>> 
+>>> query.post_filters = [empty_to_nonetype, detect_numbers]
+>>> 
+>>> print result_set.lists
+[['my-monitor01', 1, 'val1', 'val2'], ['my-monitor01', 1, None, 'bar']]
 ```
