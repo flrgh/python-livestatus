@@ -88,11 +88,13 @@ class MonitorNode(object):
 
 class Query(object):
 
-    def __init__(self, table, columns, ls_filters=[], post_filters=[]):
-        self.table   = table
-        self.columns = columns
-        self.ls_filters = ls_filters
-        self.post_filters = post_filters
+    def __init__(self, table, columns, ls_filters=[], post_filters=[],
+                 omit_monitor_column=False):
+        self.table               = table
+        self.columns             = columns
+        self.ls_filters          = ls_filters
+        self.post_filters        = post_filters
+        self.omit_monitor_column = omit_monitor_column
 
 
     @property
@@ -147,7 +149,10 @@ class QueryResult(object):
 
     @property
     def named_tuples(self):
-        fields = ['monitor'] + self.query.columns
+        if not self.query.omit_monitor_column:
+            fields = ['monitor'] + self.query.columns
+        else:
+            fields = self.query.columns
         nt_row = namedtuple('Row', fields)
         return [nt_row(**row) for row in self.dicts]
 
@@ -167,10 +172,13 @@ class QueryResult(object):
                                         self.query.columns,
                                         self.apply_filters(row.split(';'))
                                         ))
-                    row_dict['monitor'] = monitor
+                    if not self.query.omit_monitor_column:
+                        row_dict['monitor'] = monitor
                     results.append(row_dict)
                 elif format == 'lists':
-                    row_list = [monitor]
+                    row_list = []
+                    if not self.query.omit_monitor_column:
+                        row_list += [monitor]
                     row_list += self.apply_filters(row.split(';'))
                     results.append(row_list)
         return results

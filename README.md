@@ -37,8 +37,13 @@ A Python library for the Livestatus API
     }
 ]
 ```
-
-Basic callable filters can be registered on a Query object, which will be applied after querying data
+The `monitor` column is added post-query as this is not provided by livestatus. You can disable this behavior by setting a query's `omit_monitor_column` attribute to `True`:
+```
+>>> query.omit_monitor_column = True
+>>> print result_set.lists
+[['my-monitor01', '1', 'val1', 'val2'], ['my-monitor01', '1', '', 'bar']]
+```
+Basic callable filters can be registered on a Query object, which will be applied after querying data:
 
 ```
 >>> from livestatus.filters import empty_to_nonetype, detect_numbers
