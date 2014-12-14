@@ -152,6 +152,7 @@ class MonitorNode(object):
                 data = ''
             data += received
         s.close()
+        data = data.strip('\n')
         return data, status, length
 
     def __repr__(self):
@@ -381,6 +382,9 @@ def monitor_worker(mon_queue, conn):
             data, status, length = monitor.run_query(query.query_text)
             if data is None:
                 error = '{} did not return any data'.format(monitor.name)
+            elif status != 200:
+                error = 'Error {code}: "{msg}"'.format(code=status, msg=data)
+                data = None
         except Exception as e:
             error = e.message
         finally:
