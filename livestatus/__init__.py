@@ -1,7 +1,8 @@
+import datetime
 import json
 import logging
 import socket
-from collections import namedtuple
+from collections import namedtuple, OrderedDict
 from multiprocessing import Process, Queue, Pipe
 
 
@@ -51,7 +52,11 @@ class LivestatusClient(object):
             QueryResult
 
         '''
-        results = QueryResult(query)
+        if query.auto_detect_types:
+            col_types = self._get_column_datatypes(query)
+            results = QueryResult(query, col_types=col_types)
+        else:
+            results = QueryResult(query)
         mon_queue = Queue()
         processes = []
         output = []
@@ -85,6 +90,25 @@ class LivestatusClient(object):
 
         return results
 
+    def _get_column_datatypes(self, query):
+        filters = []
+        filters.append('table = {}'.format(query.table))
+        col_filters = ['name = {}'.format(name) for name in query.columns]
+        filters += col_filters
+        or_filter = 'Or: {}'.format(len(col_filters))
+        filters.append(or_filter)
+        dt_query = Query('columns', ['name', 'type'],
+                         ls_filters=filters,
+                         )
+        dt_results = self.run(dt_query)
+        results = OrderedDict()
+        for column in query.columns:
+            for row in dt_results.named_tuples:
+                if row.name == column:
+                    results[column] = row.type
+                    break
+        return results
+
     def __repr__(self):
         return '<LivestatusClient parallel: {}>'.format(self.parallel)
 
@@ -108,18 +132,27 @@ class MonitorNode(object):
         Returns:
             result (str)
         '''
-        s = socket.create_connection((self.ip, self.port))
+        s = socket.create_connection((self.ip, self.port), 5)
         s.send(query)
         s.shutdown(socket.SHUT_WR)
-        result = ''
-        while True:
-            received = s.recv(4096)
-            if received == '':
-                break
+        headers = s.recv(16)
+        status = headers.split()[0]
+        length = int(headers.split()[1])
+        data = None
+        bytes_remaining = length
+        BUFFER = 4096
+        while bytes_remaining > 0:
+            if bytes_remaining < BUFFER:
+                received = s.recv(bytes_remaining)
+                bytes_remaining = 0
             else:
-                result += received
+                received = s.recv(BUFFER)
+                bytes_remaining -= BUFFER
+            if data is None:
+                data = ''
+            data += received
         s.close()
-        return result
+        return data, status, length
 
     def __repr__(self):
         return '<MonitorNode {}>'.format(self.ip)
@@ -130,7 +163,7 @@ class Query(object):
     provides a means for filtering data after retrieval'''
 
     def __init__(self, table, columns, ls_filters=[], post_filters=[],
-                 omit_monitor_column=False):
+                 omit_monitor_column=False, auto_detect_types=False):
         '''Query constructor
 
         Args:
@@ -144,13 +177,18 @@ class Query(object):
             omit_monitor_column (bool): if true, results will not
                 include monitor names in them, just the data from
                 livestatus
+            auto_detect_types (bool): if True, the LivestatusClient
+                will first make a request to the 'columns' table in
+                order to try to determine the datatype of each column.
+                A QueryResult object will then convert column data
+                appropriately.
         '''
         self.table               = table
         self.columns             = columns
         self.ls_filters          = ls_filters
         self.post_filters        = post_filters
         self.omit_monitor_column = omit_monitor_column
-
+        self.auto_detect_types   = auto_detect_types
 
     @property
     def query_text(self):
@@ -171,11 +209,20 @@ class Query(object):
         '''
 
         query = 'GET {req}\n'.format(req=table)
-        query += 'Columns: {cols}\n'.format(
-            cols=' '.join(c for c in columns)
-            )
+        if columns:
+            query += 'Columns: {cols}\n'.format(
+                cols=' '.join(c for c in columns)
+                )
         for f in filters:
-            query += 'Filter: {filter}\n'.format(filter=f)
+            if any([
+                    f.startswith('Or:'),
+                    f.startswith('And:'),
+                    f.startswith('Negate:'),
+                    ]):
+                query += f + '\n'
+            else:
+                query += 'Filter: {filter}\n'.format(filter=f)
+        query += 'ResponseHeader: fixed16\n'
         return query
 
     def __repr__(self):
@@ -187,7 +234,8 @@ class QueryResult(object):
     retrieved from livestatus
     '''
 
-    def __init__(self, query, monitor=None, data=None, error=None):
+    def __init__(self, query, monitor=None, data=None, error=None,
+                 col_types={}):
         '''QueryResult constructor
 
         Args:
@@ -197,9 +245,12 @@ class QueryResult(object):
             data (str): the raw data from a livestatus query
             error (str or Exception): any errors/warnings raised when
                 querying the monitor
+            col_types (dict): a dict with a mapping of types for each
+                column represented in the result set.
         '''
         self.query   = query
         self.results = {}
+        self.col_types = col_types
         if monitor is not None and (data is not None or error is not None):
             self.update(monitor, data, error)
 
@@ -231,7 +282,7 @@ class QueryResult(object):
     @property
     def dicts(self):
         '''Return a list of dict objects'''
-        return self._parse_data(format='dicts')
+        return self._parse_data()
 
     @property
     def errors(self):
@@ -263,6 +314,7 @@ class QueryResult(object):
                                         self.query.columns,
                                         self._apply_filters(row.split(';'))
                                         ))
+                    row_dict = self._conv_types(row_dict)
                     if not self.query.omit_monitor_column:
                         row_dict['monitor'] = monitor
                     results.append(row_dict)
@@ -270,10 +322,32 @@ class QueryResult(object):
                     row_list = []
                     if not self.query.omit_monitor_column:
                         row_list += [monitor]
-                    row_list += self._apply_filters(row.split(';'))
+                    items = self._conv_types(row.split(';'))
+                    items = self._apply_filters(items)
+                    row_list += items
                     results.append(row_list)
         return results
 
+    def _conv_types(self, row):
+        converters = {
+            'string': str,
+            'float' : float,
+            'int'   : int,
+            'list'  : lambda x: x.split(','),
+            'time'  : lambda x: datetime.datetime.fromtimestamp(float(x)),
+            }
+        if isinstance(row, dict):
+            for key, value in row.items():
+                conv = converters.get(self.col_types.get(key), str)
+                row[key] = conv(value)
+            return row
+        elif isinstance(row, list):
+            result = []
+            row_dict = OrderedDict(zip(self.query.columns,row))
+            for key, value in row_dict.items():
+                conv = converters.get(self.col_types.get(key), str)
+                result.append(conv(value))
+            return result
 
     def _apply_filters(self, result_list):
         '''Private method that applies filters in
@@ -304,12 +378,11 @@ def monitor_worker(mon_queue, conn):
         data = None
         error = None
         try:
-            data = monitor.run_query(query.query_text)
-            if data.strip('\n ') == '':
-                data = None
+            data, status, length = monitor.run_query(query.query_text)
+            if data is None:
                 error = '{} did not return any data'.format(monitor.name)
         except Exception as e:
-            error = e
+            error = e.message
         finally:
             conn.send((monitor.name, data, error))
     conn.send('STOP')
