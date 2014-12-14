@@ -1,5 +1,7 @@
 import unittest
+from . import *
 from livestatus import *
+from multiprocessing import Process
 
 
 class TestLivestatusClientConstruction(unittest.TestCase):
@@ -69,7 +71,7 @@ class TestLivestatusClientConstruction(unittest.TestCase):
         self.assertIsInstance(ls.monitors[1], MonitorNode)
 
 
-class TestLivestatusAddMonitors(unittest.TestCase):
+class TestLivestatusClientAddMonitors(unittest.TestCase):
 
     def setUp(self):
         self.monitor1_as_dict = {
@@ -80,7 +82,7 @@ class TestLivestatusAddMonitors(unittest.TestCase):
         self.monitor1_as_object = MonitorNode(**self.monitor1_as_dict)
 
         self.monitor2_as_dict = {
-                'name': 'my-monitor01',
+                'name': 'my-monitor02',
                 'ip'  : '1.2.3.5',
                 'port': 4001
                 }
@@ -110,3 +112,42 @@ class TestLivestatusAddMonitors(unittest.TestCase):
         ls.add_monitors([self.monitor1_as_dict])
         self.assertEqual(len(ls.monitors), 1)
         self.assertIsInstance(ls.monitors[0], MonitorNode)
+
+    def test_add_multiple_monitors(self):
+        
+        # Two objects
+        ls = LivestatusClient()
+        ls.add_monitors([self.monitor1_as_object,
+                         self.monitor2_as_object])
+        self.assertEqual(len(ls.monitors), 2)
+        self.assertIsInstance(ls.monitors[0], MonitorNode)
+        self.assertIsInstance(ls.monitors[1], MonitorNode)
+
+        # Two objects, mixed types
+        ls = LivestatusClient()
+        ls.add_monitors([self.monitor1_as_object,
+                         self.monitor2_as_dict])
+        self.assertEqual(len(ls.monitors), 2)
+        self.assertIsInstance(ls.monitors[0], MonitorNode)
+        self.assertIsInstance(ls.monitors[1], MonitorNode)
+
+        # If a user tries to add a duplicate monitor, we should raise an error
+        ls = LivestatusClient()
+        ls.add_monitors(self.monitor1_as_object)
+        self.assertRaises(ValueError, ls.add_monitors, self.monitor1_as_dict)
+        self.assertEqual(len(ls.monitors), 1)
+
+
+class TestLivestatusClientRunQuery(unittest.TestCase):
+    
+    def setUp(self):
+        self.server = WellBehavedServer()
+        self.host, self.port = self.server.get_sock()
+        self.process = Process(target=self.server.run)
+        self.process.start()
+
+    def tearDown(self):
+        self.process.terminate()
+
+class TestLivestatusClientRunQueryWithTypes(unittest.TestCase):
+    pass

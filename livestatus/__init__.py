@@ -33,9 +33,17 @@ class LivestatusClient(object):
     def add_monitors(self, monitors):
         '''A helper function for setting self.monitors'''
         if isinstance(monitors, MonitorNode):
-            self.monitors.append(monitors)
+            if all([
+                    monitors.ip in [m.ip for m in self.monitors],
+                    monitors.port in [m.port for m in self.monitors],
+                    ]) \
+                    or monitors.name in [m.name for m in self.monitors]:
+                raise ValueError('Duplicate monitor')
+            else:
+                self.monitors.append(monitors)
         elif isinstance(monitors, dict):
-            self.monitors.append(MonitorNode(**monitors))
+            mon = MonitorNode(**monitors)
+            self.add_monitors(mon)
         else:
             for monitor in monitors:
                 self.add_monitors(monitor)
