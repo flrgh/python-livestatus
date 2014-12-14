@@ -57,7 +57,7 @@ The `monitor` column is added post-query as this is not provided by livestatus. 
 ]
 ```
 
-Basic callable filters can be registered on a Query object, which will be applied after querying data:
+Callable filters can be registered on a Query object, which will be applied after querying data:
 
 
 ```
@@ -70,4 +70,34 @@ Basic callable filters can be registered on a Query object, which will be applie
 >>> 
 >>> print result_set.lists
 [['MY-MONITOR01', 1, 'VAL1', 'VAL2'], ['MY-MONITOR01', 1, None, 'BAR']]
+```
+
+You can optionally set your query's `auto_detect_types` attribute to `True` to handle data conversions. The client will query the livestatus `columns` table to retreive data types and then convert the data from the resulting livestatus query:
+
+```
+>>> query = Query(table='services',
+>>>               columns=['host_name', 'state', 'host_last_check', 'host_services'],
+>>>               ls_filters=['state != 0'],
+>>>               auto_detect_types=True
+>>>              )
+>>> 
+>>> result_set = lc.run(query)
+>>> 
+>>> print result_set.dicts
+[
+    {
+        'monitor'        : 'my-monitor01',
+        'host_name'      : 'my_host',
+        'state'          : 1,
+        'host_last_check': datetime.datetime(2014, 12, 14, 7, 32, 12),
+        'host_services'  : ['smtp', 'ssh']
+    },
+    {
+        'monitor'        : 'my-monitor01'
+        'host_name'      : 'my_other_host,
+        'state'          : 2,
+        'host_last_check': datetime.datetime(2014, 12, 14, 7, 31, 5),
+        'host_services'  : ['ssh', 'http']
+    }
+]
 ```
