@@ -1,4 +1,4 @@
-ompiled python modules.
+# Compiled python modules.
 *.pyc
 
 # Setuptools distribution folder.
@@ -7,3 +7,6 @@ ompiled python modules.
 # Python egg metadata, regenerated from source files by setuptools.
 /*.egg-info
 /*.egg
+
+# Editor files
+*.swp
