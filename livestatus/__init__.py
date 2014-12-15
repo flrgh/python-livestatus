@@ -140,27 +140,38 @@ class MonitorNode(object):
         Returns:
             result (str)
         '''
-        s = socket.create_connection((self.ip, self.port), 5)
-        s.send(query)
-        s.shutdown(socket.SHUT_WR)
-        headers = s.recv(16)
-        status = headers.split()[0]
-        length = int(headers.split()[1])
-        data = None
-        bytes_remaining = length
-        BUFFER = 4096
-        while bytes_remaining > 0:
-            if bytes_remaining < BUFFER:
-                received = s.recv(bytes_remaining)
-                bytes_remaining = 0
-            else:
-                received = s.recv(BUFFER)
-                bytes_remaining -= BUFFER
-            if data is None:
-                data = ''
-            data += received
-        s.close()
-        data = data.strip('\n')
+        try:
+            s = socket.create_connection((self.ip, self.port), 3)
+            s.send(query)
+            s.shutdown(socket.SHUT_WR)
+            headers = s.recv(16)
+        except socket.error:
+            msg = 'Could not connect to {}:{}'.format(self.ip, self.port)
+            raise MonitorNodeError(msg)
+        try:
+            status = int(headers.split()[0])
+            length = int(headers.split()[1])
+        except (IndexError, ValueError):
+            msg = '{} did not return a proper response header'.format(self.name)
+            raise MonitorNodeError(msg)
+
+        try:
+            data = ''
+            bytes_remaining = length
+            BUFFER = 4096
+            while bytes_remaining > 0:
+                if bytes_remaining < BUFFER:
+                    received = s.recv(bytes_remaining)
+                    bytes_remaining = 0
+                else:
+                    received = s.recv(BUFFER)
+                    bytes_remaining -= BUFFER
+                data += received
+            s.close()
+            data = data.strip('\n')
+        except socket.error:
+            msg = 'Lost connection with {} while receiving data'.format(self.name)
+            raise MonitorNodeError(msg)
         return data, status, length
 
     def __repr__(self):
@@ -388,7 +399,7 @@ def monitor_worker(mon_queue, conn):
         error = None
         try:
             data, status, length = monitor.run_query(query.query_text)
-            if data is None:
+            if data is None or data.strip('\n\t ') == '':
                 error = '{} did not return any data'.format(monitor.name)
             elif status != 200:
                 error = 'Error {code}: "{msg}"'.format(code=status, msg=data)
@@ -399,3 +410,7 @@ def monitor_worker(mon_queue, conn):
             conn.send((monitor.name, data, error))
     conn.send('STOP')
     return
+
+
+class MonitorNodeError(Exception):
+    pass

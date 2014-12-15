@@ -1,6 +1,7 @@
 import random
 import socket
-from multiprocessing import Process, Pipe
+import time
+from multiprocessing import Process
 
 
 class ServerHelper(object):
@@ -120,7 +121,11 @@ class MockLivestatusServer(object):
 class WellBehavedServer(MockLivestatusServer):
     '''Returns a proper, well-formed response'''
     def make_response(self, data):
-        dummy_data = 'col1;col2;\n2;3\n'
+        if data.startswith('GET columns\n'):
+            dummy_data = 'col1;string\ncol2;int\ncol3;time\ncol4;list\n'
+        else:
+            dummy_data = 'string1;1;1418675988;1,2,3\n' + \
+                         'string2;2;1418675987;a,b,c\n'
         header = self.make_header(dummy_data)
         return header + dummy_data
 
@@ -144,3 +149,17 @@ class TimeoutServer(MockLivestatusServer):
     def make_response(self, data):
         while True:
             time.sleep(60)
+
+
+class DeadServer(MockLivestatusServer):
+    '''This server will shut the socket before you can try to query it'''
+    def run(self):
+        self.socket.close()
+
+class RudeServer(MockLivestatusServer):
+    '''This server will shut down the socket after sending some data'''
+    def run(self):
+        client, address = self.socket.accept()
+        data = client.recv(4096)
+        client.send('something!')
+        self.socket.close()
