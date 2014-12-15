@@ -1,5 +1,44 @@
 import random
 import socket
+from multiprocessing import Process, Pipe
+
+
+class ServerHelper(object):
+    '''A helper object for managing a separate python process with a
+    LiveStatus server running in it
+    '''
+
+    conn = None
+    host = None
+    port = None
+    def __init__(self, cls):
+        self.server = cls()
+
+    def start(self):
+        self.host, self.port = self.server.get_sock()
+        self.proc = Process(target=self.server.run)
+        self.proc.start()
+        return self.host, self.port
+
+    def stop(self):
+        self.proc.terminate()
+        self.proc.join(1)
+
+    def get_last_recv(self):
+        s = socket.create_connection((self.host, self.port), 5)
+        s.send('GET-LAST-RECV')
+        s.shutdown(socket.SHUT_WR)
+        msg = s.recv(1024)
+        s.close()
+        return msg
+
+    def get_last_send(self):
+        s = socket.create_connection((self.host, self.port), 5)
+        s.send('GET-LAST-SEND')
+        s.shutdown(socket.SHUT_WR)
+        msg = s.recv(1024)
+        s.close()
+        return msg
 
 
 class MockLivestatusServer(object):
@@ -10,7 +49,6 @@ class MockLivestatusServer(object):
     host = '127.0.0.1' # Only bind to localhost
     port = None
     socket = None
-
     def get_sock(self):
         '''Helper method that tries to pick a random port to bind to'''
         for attempt in xrange(10):
@@ -19,7 +57,7 @@ class MockLivestatusServer(object):
                 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 s.bind((self.host, rand_port))
                 self.socket = s
-                self.socket.listen(1)
+                self.socket.listen(5)
                 self.port = rand_port
                 break
             except Exception as e:
@@ -31,14 +69,23 @@ class MockLivestatusServer(object):
             return self.host, self.port
 
     def run(self):
+        last_recv = []
+        last_send = []
         while True:
             client, address = self.socket.accept()
-            data = client.recv(2048)
+            data = client.recv(4096)
             if data is not None:
-                response = self.make_response(data)
-                client.send(response)
+                if data == 'GET-LAST-RECV':
+                    client.send(last_recv.pop())
+                elif data == 'GET-LAST-SEND':
+                    client.send(last_send.pop())
+                else:
+                    last_recv.append(data)
+                    response = self.make_response(data)
+                    client.send(response)
+                    last_send.append(response)
             client.close()
-    
+
     def make_response(self, data):
         '''Method for generating response data to be seint back to the
         client. Subclasses of MockLivestatusServer should override this
@@ -71,7 +118,29 @@ class MockLivestatusServer(object):
 
 
 class WellBehavedServer(MockLivestatusServer):
-    def make_resonse(data):
-        dummy_data = 'col1;col2;col3;\n1;2;3\n'
+    '''Returns a proper, well-formed response'''
+    def make_response(self, data):
+        dummy_data = 'col1;col2;\n2;3\n'
         header = self.make_header(dummy_data)
         return header + dummy_data
+
+
+class EmptyResponseServer(MockLivestatusServer):
+    '''Returns a well-formed but empty response'''
+    def make_response(self, data):
+        dummy_data = ''
+        header = self.make_header(dummy_data)
+        return header + dummy_data
+
+
+class NoDataServer(MockLivestatusServer):
+    '''Returns a completely empty response (no headers)'''
+    def make_response(self, data):
+        return ''
+
+
+class TimeoutServer(MockLivestatusServer):
+    '''Accepts connections but never returns a response'''
+    def make_response(self, data):
+        while True:
+            time.sleep(60)

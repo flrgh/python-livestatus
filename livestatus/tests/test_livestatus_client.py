@@ -141,13 +141,57 @@ class TestLivestatusClientAddMonitors(unittest.TestCase):
 class TestLivestatusClientRunQuery(unittest.TestCase):
     
     def setUp(self):
-        self.server = WellBehavedServer()
-        self.host, self.port = self.server.get_sock()
-        self.process = Process(target=self.server.run)
-        self.process.start()
+        self.server = ServerHelper(WellBehavedServer)
+        self.host, self.port = self.server.start()
+        self.monitor = MonitorNode(self.host, port=self.port)
 
+    def test_return_val(self):
+        ls = LivestatusClient(monitors=self.monitor)
+        query = Query('table', ['col1','col2'])
+        result = ls.run(query)
+      
+        # Make sure we got a QueryResult instance back
+        self.assertIsInstance(result, QueryResult)
+
+        # Make sure the proper query was received by the livestatus server
+        msg = self.server.get_last_recv()
+        self.assertEqual(query.query_text, msg)
+        
     def tearDown(self):
-        self.process.terminate()
+        self.server.stop()
+
+
+class TestLivestatusClientNoResponse(unittest.TestCase):
+    pass
+
+
+class TestLivestatusClientEmptyResponse(unittest.TestCase):
+
+    def setUp(self):
+        self.server = ServerHelper(EmptyResponseServer)
+        self.host, self.port = self.server.start()
+        self.monitor = MonitorNode(self.host, port=self.port)
+
+    def test_return_val(self):
+        ls = LivestatusClient(monitors=self.monitor)
+        query = Query('table', ['col1', 'col2'])
+        result = ls.run(query)
+
+        msg = self.server.get_last_recv()
+        self.assertEqual(query.query_text, msg)
+        self.assertIsInstance(result, QueryResult)
+
+        # There should be an error if livestatus returns no data
+        self.assertIn(self.monitor.name, result.errors.keys())
+
 
 class TestLivestatusClientRunQueryWithTypes(unittest.TestCase):
+    pass
+
+
+class TestLivestatusClientTimeout(unittest.TestCase):
+    pass
+
+
+class TestLivestatusClientNoConnection(unittest.TestCase):
     pass
