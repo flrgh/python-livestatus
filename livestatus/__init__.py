@@ -257,7 +257,7 @@ class QueryResult(object):
     '''
 
     def __init__(self, query, monitor=None, data=None, error=None,
-                 col_types={}):
+                 col_types={}, time_format='datetime'):
         '''QueryResult constructor
 
         Args:
@@ -269,10 +269,15 @@ class QueryResult(object):
                 querying the monitor
             col_types (dict): a dict with a mapping of types for each
                 column represented in the result set.
+            time_format (str): ('datetime' or 'stamp' accepted). If
+                'datetime', timestamps will be converted to a datetime
+                object. Otherwise they'll be left as a Unix timestamp
+                (a float)
         '''
         self.query   = query
         self.results = {}
         self.col_types = col_types
+        self.time_format = time_format
         if monitor is not None and (data is not None or error is not None):
             self.update(monitor, data, error)
 
@@ -358,6 +363,9 @@ class QueryResult(object):
             'list'  : lambda x: x.split(','),
             'time'  : lambda x: datetime.datetime.fromtimestamp(float(x)),
             }
+        if self.time_format == 'stamp':
+            converters['time'] = float
+
         if isinstance(row, dict):
             for key, value in row.items():
                 conv = converters.get(self.col_types.get(key), str)

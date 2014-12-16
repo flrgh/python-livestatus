@@ -191,6 +191,30 @@ class TestLivestatusClientRunQueryWithTypes(unittest.TestCase):
             self.assertIsInstance(row['col3'], datetime.datetime)
             self.assertIsInstance(row['col4'], list)
 
+    def test_auto_detect_types_timestamp(self):
+        ls = LivestatusClient(monitors=self.monitor)
+        query = Query('table', ['col1', 'col2', 'col3', 'col4'])
+        query.auto_detect_types = True
+
+        result = ls.run(query)
+
+        self.assertIsInstance(result, QueryResult)
+        result.time_format = 'stamp'
+
+        # Make sure QueryResult had the right column types set
+        self.assertEqual(result.col_types['col1'], 'string')
+        self.assertEqual(result.col_types['col2'], 'int')
+        self.assertEqual(result.col_types['col3'], 'time')
+        self.assertEqual(result.col_types['col4'], 'list')
+
+        # Check to make sure values were converted properly
+        for row in result.dicts:
+            self.assertIsInstance(row['col1'], str)
+            self.assertIsInstance(row['col2'], int)
+            self.assertIsInstance(row['col3'], float)
+            self.assertIsInstance(row['col4'], list)
+
+
     def tearDown(self):
         self.server.stop()
 
