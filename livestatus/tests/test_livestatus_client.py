@@ -144,7 +144,7 @@ class TestLivestatusClientRunQuery(unittest.TestCase):
     def setUp(self):
         self.server = ServerHelper(WellBehavedServer)
         self.host, self.port = self.server.start()
-        self.monitor = MonitorNode(self.host, port=self.port)
+        self.monitor = MonitorNode(self.host, self.port)
 
     def test_return_val(self):
         ls = LivestatusClient(monitors=self.monitor)
@@ -167,7 +167,7 @@ class TestLivestatusClientRunQueryWithTypes(unittest.TestCase):
     def setUp(self):
         self.server = ServerHelper(WellBehavedServer)
         self.host, self.port = self.server.start()
-        self.monitor = MonitorNode(self.host, port=self.port)
+        self.monitor = MonitorNode(self.host, self.port)
 
     def test_auto_detect_types(self):
         ls = LivestatusClient(monitors=self.monitor)
@@ -200,7 +200,7 @@ class TestLivestatusClientEmptyResponse(unittest.TestCase):
     def setUp(self):
         self.server = ServerHelper(EmptyResponseServer)
         self.host, self.port = self.server.start()
-        self.monitor = MonitorNode(self.host, port=self.port)
+        self.monitor = MonitorNode(self.host, self.port)
 
     def test_return_val(self):
         ls = LivestatusClient(monitors=self.monitor)
@@ -225,7 +225,7 @@ class TestLivestatusClientNoResponse(unittest.TestCase):
     def setUp(self):
         self.server = ServerHelper(NoDataServer)
         self.host, self.port = self.server.start()
-        self.monitor = MonitorNode(self.host, port=self.port)
+        self.monitor = MonitorNode(self.host, self.port)
 
     def test_handle_no_response(self):
         ls = LivestatusClient(monitors=self.monitor)
@@ -246,7 +246,7 @@ class TestLivestatusClientTimeout(unittest.TestCase):
     def setUp(self):
         self.server = ServerHelper(TimeoutServer)
         self.host, self.port = self.server.start()
-        self.monitor = MonitorNode(self.host, port=self.port)
+        self.monitor = MonitorNode(self.host, self.port)
 
     def test_monitor_timeout(self):
         ls = LivestatusClient(monitors=self.monitor)
@@ -265,7 +265,7 @@ class TestLivestatusClientNoConnection(unittest.TestCase):
     def setUp(self):
         self.server = ServerHelper(TimeoutServer)
         self.host, self.port = self.server.start()
-        self.monitor = MonitorNode(self.host, port=self.port)
+        self.monitor = MonitorNode(self.host, self.port)
 
     def test_monitor_timeout(self):
         ls = LivestatusClient(monitors=self.monitor)
@@ -284,7 +284,7 @@ class TestLivestatusClientIncomplete(unittest.TestCase):
     def setUp(self):
         self.server = ServerHelper(RudeServer)
         self.host, self.port = self.server.start()
-        self.monitor = MonitorNode(self.host, port=self.port)
+        self.monitor = MonitorNode(self.host, self.port)
 
     def test_monitor_timeout(self):
         ls = LivestatusClient(monitors=self.monitor)

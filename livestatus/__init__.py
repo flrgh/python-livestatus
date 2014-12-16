@@ -2,6 +2,7 @@ import datetime
 import time
 import json
 import logging
+import re
 import socket
 from collections import namedtuple, OrderedDict
 from multiprocessing import Process, Queue, Pipe
@@ -127,7 +128,7 @@ class MonitorNode(object):
     query against that monitor
     '''
 
-    def __init__(self, ip, port=9999, name=None):
+    def __init__(self, ip, port, name=None):
         self.ip   = ip
         self.port = port
         self.name = name if name is not None else ip
@@ -150,6 +151,8 @@ class MonitorNode(object):
             msg = 'Could not connect to {}:{}'.format(self.ip, self.port)
             raise MonitorNodeError(msg)
         try:
+            if len(headers) != 16 or re.match('\d\d\d\s*\d+\s*\n', headers) is None:
+                raise ValueError
             status = int(headers.split()[0])
             length = int(headers.split()[1])
         except (IndexError, ValueError):
