@@ -126,7 +126,11 @@ class WellBehavedServer(MockLivestatusServer):
         else:
             dummy_data = 'string1;1;1418675988;1,2,3\n' + \
                          'string2;2;1418675987;a,b,c\n'
-        header = self.make_header(dummy_data)
+
+        if 'ResponseHeader: fixed16' in data:
+            header = self.make_header(dummy_data)
+        else:
+            header = ''
         return header + dummy_data
 
 
