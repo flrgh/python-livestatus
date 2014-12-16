@@ -1,4 +1,5 @@
 import datetime
+import time
 import json
 import logging
 import socket
@@ -162,13 +163,11 @@ class MonitorNode(object):
             while bytes_remaining > 0:
                 if bytes_remaining < BUFFER:
                     received = s.recv(bytes_remaining)
-                    bytes_remaining = 0
                 else:
                     received = s.recv(BUFFER)
-                    bytes_remaining -= BUFFER
+                bytes_remaining -= len(received)
                 data += received
             s.close()
-            data = data.strip('\n')
         except socket.error:
             msg = 'Lost connection with {} while receiving data'.format(self.name)
             raise MonitorNodeError(msg)
