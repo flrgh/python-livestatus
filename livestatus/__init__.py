@@ -256,17 +256,12 @@ class QueryResultSet(object):
     retrieved from livestatus
     '''
 
-    def __init__(self, query, monitor=None, data=None, error=None,
-                 col_types={}, time_format='datetime'):
+    def __init__(self, query, col_types={}, time_format='datetime'):
         '''QueryResultSet constructor
 
         Args:
             query (Query): a Query object
         Kwargs:
-            monitor (str): a monitor name/alias
-            data (str): the raw data from a livestatus query
-            error (str or Exception): any errors/warnings raised when
-                querying the monitor
             col_types (dict): a dict with a mapping of types for each
                 column represented in the result set.
             time_format (str): ('datetime' or 'stamp' accepted). If
@@ -278,8 +273,7 @@ class QueryResultSet(object):
         self.results = {}
         self.col_types = col_types
         self.time_format = time_format
-        if monitor is not None and (data is not None or error is not None):
-            self.update(monitor, data, error)
+        self.columns = self.query.columns
 
     def update(self, monitor, data, error):
         self.results[monitor] = {}
@@ -299,12 +293,13 @@ class QueryResultSet(object):
     @property
     def named_tuples(self):
         '''Return a list of namedtuple objects'''
+        parsed = self.dicts
         if not self.query.omit_monitor_column:
-            fields = ['monitor'] + self.query.columns
+            fields = ['monitor'] + self.columns
         else:
-            fields = self.query.columns
+            fields = self.columns
         nt_row = namedtuple('Row', fields)
-        return [nt_row(**row) for row in self.dicts]
+        return [nt_row(**row) for row in parsed]
 
     @property
     def dicts(self):
@@ -335,10 +330,15 @@ class QueryResultSet(object):
                 continue
             data = data.strip('\n ')
             rows = data.split('\n')
+            if self.query.columns == []:
+                self.columns = rows[0].split(';')
+                del(rows[0])
+            else:
+                self.columns = self.query.columns
             for row in rows:
                 if format == 'dicts':
                     row_dict = dict(zip(
-                                        self.query.columns,
+                                        self.columns,
                                         self._apply_filters(row.split(';'))
                                         ))
                     row_dict = self._conv_types(row_dict)
@@ -373,7 +373,7 @@ class QueryResultSet(object):
             return row
         elif isinstance(row, list):
             result = []
-            row_dict = OrderedDict(zip(self.query.columns,row))
+            row_dict = OrderedDict(zip(self.columns,row))
             for key, value in row_dict.items():
                 conv = converters.get(self.col_types.get(key), str)
                 result.append(conv(value))
