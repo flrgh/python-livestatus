@@ -151,8 +151,8 @@ class TestLivestatusClientRunQuery(unittest.TestCase):
         query = Query('table', ['col1', 'col2', 'col3', 'col4'])
         result = ls.run(query)
       
-        # Make sure we got a QueryResult instance back
-        self.assertIsInstance(result, QueryResult)
+        # Make sure we got a QueryResultSet instance back
+        self.assertIsInstance(result, QueryResultSet)
 
         # Make sure the proper query was received by the livestatus server
         msg = self.server.get_last_recv()
@@ -176,9 +176,9 @@ class TestLivestatusClientRunQueryWithTypes(unittest.TestCase):
 
         result = ls.run(query)
 
-        self.assertIsInstance(result, QueryResult)
+        self.assertIsInstance(result, QueryResultSet)
 
-        # Make sure QueryResult had the right column types set
+        # Make sure QueryResultSet had the right column types set
         self.assertEqual(result.col_types['col1'], 'string')
         self.assertEqual(result.col_types['col2'], 'int')
         self.assertEqual(result.col_types['col3'], 'time')
@@ -198,10 +198,10 @@ class TestLivestatusClientRunQueryWithTypes(unittest.TestCase):
 
         result = ls.run(query)
 
-        self.assertIsInstance(result, QueryResult)
+        self.assertIsInstance(result, QueryResultSet)
         result.time_format = 'stamp'
 
-        # Make sure QueryResult had the right column types set
+        # Make sure QueryResultSet had the right column types set
         self.assertEqual(result.col_types['col1'], 'string')
         self.assertEqual(result.col_types['col2'], 'int')
         self.assertEqual(result.col_types['col3'], 'time')
@@ -233,7 +233,7 @@ class TestLivestatusClientEmptyResponse(unittest.TestCase):
 
         msg = self.server.get_last_recv()
         self.assertEqual(query.query_text, msg)
-        self.assertIsInstance(result, QueryResult)
+        self.assertIsInstance(result, QueryResultSet)
 
         # There should be an error if livestatus returns no data
         self.assertIn(self.monitor.name, result.errors.keys())
@@ -256,7 +256,7 @@ class TestLivestatusClientNoResponse(unittest.TestCase):
         query = Query('table', ['col1', 'col2'])
         result = ls.run(query)
 
-        self.assertIsInstance(result, QueryResult)
+        self.assertIsInstance(result, QueryResultSet)
         self.assertIn(self.monitor.name, result.errors.keys())
         expected_error = self.monitor.name + ' did not return a proper response header'
         self.assertEqual(result.errors[self.monitor.name], expected_error)

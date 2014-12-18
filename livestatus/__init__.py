@@ -59,14 +59,14 @@ class LivestatusClient(object):
             query (Query): A Query object
 
         Returns:
-            QueryResult
+            QueryResultSet
 
         '''
         if query.auto_detect_types:
             col_types = self._get_column_datatypes(query)
-            results = QueryResult(query, col_types=col_types)
+            results = QueryResultSet(query, col_types=col_types)
         else:
-            results = QueryResult(query)
+            results = QueryResultSet(query)
         mon_queue = Queue()
         processes = []
         output = []
@@ -202,7 +202,7 @@ class Query(object):
             auto_detect_types (bool): if True, the LivestatusClient
                 will first make a request to the 'columns' table in
                 order to try to determine the datatype of each column.
-                A QueryResult object will then convert column data
+                A QueryResultSet object will then convert column data
                 appropriately.
         '''
         self.table               = table
@@ -251,14 +251,14 @@ class Query(object):
         return '<Query for {} table>'.format(self.table)
 
 
-class QueryResult(object):
+class QueryResultSet(object):
     '''A class for storing and providing formatted results of data
     retrieved from livestatus
     '''
 
     def __init__(self, query, monitor=None, data=None, error=None,
                  col_types={}, time_format='datetime'):
-        '''QueryResult constructor
+        '''QueryResultSet constructor
 
         Args:
             query (Query): a Query object
@@ -381,7 +381,7 @@ class QueryResult(object):
 
     def _apply_filters(self, result_list):
         '''Private method that applies filters in
-        QueryResult.query.post_filters to all column data
+        QueryResultSet.query.post_filters to all column data
         '''
         for f in self.query.post_filters:
             result_list = map(f, result_list)
@@ -392,7 +392,7 @@ class QueryResult(object):
 
     def __add__(self, other):
         if self.query.query_text != other.query.query_text:
-            raise TypeError('QueryResult queries do not match')
+            raise TypeError('QueryResultSet queries do not match')
         for monitor in other.results.keys():
             self.results[monitor] = {}
             self.results[monitor]['data'] = other.results[monitor]['data']
