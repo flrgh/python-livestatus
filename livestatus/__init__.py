@@ -184,7 +184,7 @@ class Query(object):
     '''Helper class for defining a query for livestatus, which also
     provides a means for filtering data after retrieval'''
 
-    def __init__(self, table, columns, ls_filters=[], post_filters=[],
+    def __init__(self, table, columns=[], ls_filters=[], post_filters=[],
                  omit_monitor_column=False, auto_detect_types=False):
         '''Query constructor
 
