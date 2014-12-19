@@ -426,6 +426,7 @@ def monitor_worker(mon_queue, conn):
             data, status, length = monitor.run_query(query.query_text)
             if data is None or data.strip('\n\t ') == '':
                 error = '{} did not return any data'.format(monitor.name)
+                data = None
             elif status != 200:
                 error = 'Error {code}: "{msg}"'.format(code=status, msg=data)
                 data = None
