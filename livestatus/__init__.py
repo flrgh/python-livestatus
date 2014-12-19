@@ -185,7 +185,7 @@ class Query(object):
     provides a means for filtering data after retrieval'''
 
     def __init__(self, table, columns=[], ls_filters=[], post_filters=[],
-                 omit_monitor_column=False, auto_detect_types=False):
+                 stats=[], omit_monitor_column=False, auto_detect_types=False):
         '''Query constructor
 
         Args:
@@ -196,6 +196,7 @@ class Query(object):
                 text
             post_filters (list): a list of callables that will be
                 called on all column data
+            stats (list): a list of statistics filters
             omit_monitor_column (bool): if true, results will not
                 include monitor names in them, just the data from
                 livestatus
@@ -209,18 +210,23 @@ class Query(object):
         self.columns             = columns
         self.ls_filters          = ls_filters
         self.post_filters        = post_filters
+        self.stats               = stats
         self.omit_monitor_column = omit_monitor_column
         self.auto_detect_types   = auto_detect_types
+        if len(stats) > 0 and len(columns) > 1:
+            msg = 'You cannot use more than one column with a stats query'
+            raise ValueError(msg)
 
     @property
     def query_text(self):
         return Query.build(self.table,
                            self.columns,
-                           self.ls_filters
+                           self.ls_filters,
+                           self.stats
                            )
 
     @staticmethod
-    def build(table, columns, filters=[]):
+    def build(table, columns, filters=[], stats=[]):
         '''
         Builds and returns a GET request string for the livestatus API
         Args:
@@ -244,6 +250,8 @@ class Query(object):
                 query += f + '\n'
             else:
                 query += 'Filter: {filter}\n'.format(filter=f)
+        for s in stats:
+            query += 'Stats: {s}\n'.format(s=s)
         query += 'ResponseHeader: fixed16\n'
         return query
 
