@@ -339,8 +339,15 @@ class QueryResultSet(object):
             data = data.strip('\n ')
             rows = data.split('\n')
             if self.query.columns == []:
-                self.columns = rows[0].split(';')
-                del(rows[0])
+                if len(self.query.stats) > 0:
+                    cols = []
+                    if len(self.query.columns) > 0:
+                        cols.append(self.query.columns[0])
+                    cols.extend(self.query.stats)
+                    self.columns = cols
+                else:
+                    self.columns = rows[0].split(';')
+                    del(rows[0])
             else:
                 self.columns = self.query.columns
             for row in rows:
