@@ -75,7 +75,7 @@ class LivestatusClient(object):
         for mon in self.monitors:
             mon_queue.put((mon, query))
 
-        if self.workers == 0:
+        if self.workers == 0 or self.workers > len(self.monitors):
             self.workers = len(self.monitors)
 
         for w in xrange(0,self.workers):
