@@ -4,6 +4,7 @@ import json
 import logging
 import re
 import socket
+import sqlite3
 from collections import namedtuple, OrderedDict
 from multiprocessing import Process, Queue, Pipe
 
@@ -99,6 +100,10 @@ class LivestatusClient(object):
             p.join()
 
         return results
+
+    def exec_sql(self, query, stmt):
+        db = self.run(query).to_sqlite()
+        return db.execute(stmt)
 
     def _get_column_datatypes(self, query):
         filters = []
@@ -288,6 +293,43 @@ class QueryResultSet(object):
         self.results[monitor]['data'] = data
         self.results[monitor]['error'] = error
 
+    def to_sqlite(self):
+        '''Dumps the query results into an sqlite database and returns
+        a connection object to that database
+        '''
+        sqlite_type_index = {
+            'str': 'TEXT',
+            'int': 'INTEGER',
+            'float': 'REAL',
+            'time': 'REAL' if self.time_format == 'stamp' else 'TEXT'
+        }
+        rows = self._parse_data(format='lists',flatten=True)
+        columns = []
+        if not self.query.omit_monitor_column:
+            columns.append('monitor TEXT')
+        for c in self.columns:
+            ctype = sqlite_type_index.get(self.col_types.get(c),'TEXT')
+            columns.append(c + ' ' + ctype)
+        create_kwargs = {
+            'table': self.query.table,
+            'columns': ', '.join(columns)
+        }
+        conn = sqlite3.connect(':memory:')
+        create_query = 'CREATE TABLE {table}({columns})'.format(**create_kwargs)
+        conn.execute(create_query)
+        conn.commit()
+
+        insert_q = 'INSERT INTO {table} VALUES ({params})'.format(
+                table=self.query.table,
+                params=','.join([
+                                 '?' for item in
+                                 create_kwargs['columns'].split(',')])
+                )
+        conn.executemany(insert_q, rows)
+        conn.commit()
+        return conn
+
+
     @property
     def json(self):
         '''Serialize results as a json string'''
@@ -323,7 +365,7 @@ class QueryResultSet(object):
                 errors[monitor] = self.results[monitor]['error']
         return errors
 
-    def _parse_data(self, format='dicts'):
+    def _parse_data(self, format='dicts', flatten=False):
         '''Private method that parses raw data and returns it in a
         desired format
 
@@ -356,7 +398,7 @@ class QueryResultSet(object):
                                         self.columns,
                                         self._apply_filters(row.split(';'))
                                         ))
-                    row_dict = self._conv_types(row_dict)
+                    row_dict = self._conv_types(row_dict,flatten=flatten)
                     if not self.query.omit_monitor_column:
                         row_dict['monitor'] = monitor
                     results.append(row_dict)
@@ -364,13 +406,16 @@ class QueryResultSet(object):
                     row_list = []
                     if not self.query.omit_monitor_column:
                         row_list += [monitor]
-                    items = self._conv_types(row.split(';'))
+                    items = self._conv_types(row.split(';'),flatten=flatten)
                     items = self._apply_filters(items)
                     row_list += items
                     results.append(row_list)
         return results
 
-    def _conv_types(self, row):
+    def _conv_types(self, row, flatten=False):
+        '''Private method used for converting return values from
+        livestatus to their desired python data type
+        '''
         converters = {
             'string': str,
             'float' : float,
@@ -378,6 +423,10 @@ class QueryResultSet(object):
             'list'  : lambda x: x.split(','),
             'time'  : lambda x: datetime.datetime.fromtimestamp(float(x)),
             }
+        if flatten:
+            converters['list'] = str
+            converters['time'] = lambda x: datetime.datetime.fromtimestamp(float(x)).isoformat(' ')
+
         if self.time_format == 'stamp':
             converters['time'] = float
 

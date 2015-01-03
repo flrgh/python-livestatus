@@ -1,3 +1,4 @@
+import sqlite3
 import unittest
 from collections import namedtuple
 from livestatus import QueryResultSet, Query
@@ -6,7 +7,7 @@ from livestatus import QueryResultSet, Query
 class TestQueryResultMinArgs(unittest.TestCase):
 
     def setUp(self):
-        self.q = Query('table')
+        self.q = Query('some_table')
         self.result_set = QueryResultSet(self.q)
         self.monitor1 = {
                 'monitor' : 'my-monitor01',
@@ -65,3 +66,13 @@ class TestQueryResultMinArgs(unittest.TestCase):
         self.assertEqual(nt.col1, 'n1')
         self.assertEqual(nt.col2, 'n2')
         self.assertEqual(nt.col3, 'n3')
+
+    def test_to_sqlite(self):
+
+        self.result_set.update(**self.monitor1)
+        self.result_set.update(**self.monitor2)
+
+        db = self.result_set.to_sqlite()
+        self.assertIsInstance(db, sqlite3.Connection)
+        rows = db.execute('SELECT * FROM some_table').fetchall()
+        self.assertEqual(len(rows), 1)
