@@ -5,7 +5,7 @@ import logging
 import re
 import socket
 import sqlite3
-from collections import namedtuple, OrderedDict
+from collections import namedtuple
 from multiprocessing import Process, Queue, Pipe
 
 
@@ -116,7 +116,7 @@ class LivestatusClient(object):
                          ls_filters=filters,
                          )
         dt_results = self.run(dt_query)
-        results = OrderedDict()
+        results = {}
         for column in query.columns:
             for row in dt_results.named_tuples:
                 if row.name == column:
@@ -444,8 +444,7 @@ class QueryResultSet(object):
             return row
         elif isinstance(row, list):
             result = []
-            row_dict = OrderedDict(zip(self.columns,row))
-            for key, value in row_dict.items():
+            for key, value in zip(self.columns,row):
                 conv = converters.get(self.col_types.get(key), str)
                 result.append(conv(value))
             return result
