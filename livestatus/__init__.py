@@ -326,9 +326,16 @@ class QueryResultSet(object):
                                  create_kwargs['columns'].split(',')])
                 )
         conn.executemany(insert_q, rows)
+        error_create = 'CREATE TABLE errors (monitor TEXT, message TXT)'
+        conn.execute(error_create)
+        for monitor, error in self.errors.items():
+            conn.execute('INSERT INTO errors VALUES (?,?)', (monitor, error))
         conn.commit()
         return conn
 
+    @staticmethod
+    def from_sql(sql):
+        pass
 
     @property
     def json(self):
