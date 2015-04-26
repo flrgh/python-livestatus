@@ -15,7 +15,7 @@ A Python library for the Livestatus API
 >>> query = Query(table='some-table',
 >>>               columns=['col1', 'col2','col3'],
 >>>               ls_filters=['col1 != 0']
->>>              )
+>>>               )
 >>> 
 >>> result_set = lc.run(query)
 >>> 
