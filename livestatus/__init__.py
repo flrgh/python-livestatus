@@ -15,7 +15,7 @@ class LivestatusClient(object):
     against multiple monitors can be done in series or parallel.
     '''
 
-    def __init__(self, monitors=[], parallel=False, workers=0):
+    def __init__(self, monitors=None, parallel=False, workers=0):
         '''Constructor for the client
 
         Kwargs:
@@ -31,7 +31,7 @@ class LivestatusClient(object):
         self.monitors = []
         self.parallel = parallel
         self.workers  = workers if self.parallel else 1
-        self.add_monitors(monitors)
+        if monitors: self.add_monitors(monitors)
 
     def add_monitors(self, monitors):
         '''A helper function for setting self.monitors'''
@@ -189,8 +189,8 @@ class Query(object):
     '''Helper class for defining a query for livestatus, which also
     provides a means for filtering data after retrieval'''
 
-    def __init__(self, table, columns=[], ls_filters=[], post_filters=[],
-                 stats=[], omit_monitor_column=False, auto_detect_types=False):
+    def __init__(self, table, columns=None, ls_filters=None, post_filters=None,
+                 stats=None, omit_monitor_column=False, auto_detect_types=False):
         '''Query constructor
 
         Args:
@@ -211,14 +211,14 @@ class Query(object):
                 A QueryResultSet object will then convert column data
                 appropriately.
         '''
-        self.table               = table
-        self.columns             = columns
-        self.ls_filters          = ls_filters
-        self.post_filters        = post_filters
-        self.stats               = stats
+        self.table = table
+        self.columns = columns if columns is not None else []
+        self.ls_filters = ls_filters if ls_filters is not None else []
+        self.post_filters = post_filters if post_filters is not None else []
+        self.stats = stats if stats is not None else []
         self.omit_monitor_column = omit_monitor_column
         self.auto_detect_types   = auto_detect_types
-        if len(stats) > 0 and len(columns) > 1:
+        if len(self.stats) > 0 and len(self.columns) > 1:
             msg = 'You cannot use more than one column with a stats query'
             raise ValueError(msg)
 
@@ -231,7 +231,7 @@ class Query(object):
                            )
 
     @staticmethod
-    def build(table, columns, filters=[], stats=[]):
+    def build(table, columns, filters=None, stats=None):
         '''
         Builds and returns a GET request string for the livestatus API
         Args:
@@ -241,6 +241,8 @@ class Query(object):
             filters (list): any custom filters to add to the request
         '''
 
+        filters = filters if filters is not None else []
+        stats = stats if stats is not None else []
         query = 'GET {req}\n'.format(req=table)
         if columns:
             query += 'Columns: {cols}\n'.format(
@@ -269,7 +271,7 @@ class QueryResultSet(object):
     retrieved from livestatus
     '''
 
-    def __init__(self, query, col_types={}, time_format='datetime'):
+    def __init__(self, query, col_types=None, time_format='datetime'):
         '''QueryResultSet constructor
 
         Args:
@@ -284,7 +286,7 @@ class QueryResultSet(object):
         '''
         self.query   = query
         self.results = {}
-        self.col_types = col_types
+        self.col_types = col_types if col_types is not None else {}
         self.time_format = time_format
         self.columns = self.query.columns
 
