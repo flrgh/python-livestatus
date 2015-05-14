@@ -277,7 +277,7 @@ class TestLivestatusClientTimeout(unittest.TestCase):
         query = Query('table', ['col1', 'col2'])
         result = ls.run(query)
 
-        expected_error = 'Could not connect to {}:{}'.format(self.monitor.ip, self.monitor.port)
+        expected_error = '{} did not return a proper response header'.format(self.monitor.name)
         self.assertEqual(expected_error, result.errors[self.monitor.name])
 
     def tearDown(self):
@@ -296,7 +296,7 @@ class TestLivestatusClientNoConnection(unittest.TestCase):
         query = Query('table', ['col1', 'col2'])
         result = ls.run(query)
 
-        expected_error = 'Could not connect to {}:{}'.format(self.monitor.ip, self.monitor.port)
+        expected_error = '{} did not return a proper response header'.format(self.monitor.name)
         self.assertEqual(expected_error, result.errors[self.monitor.name])
 
     def tearDown(self):

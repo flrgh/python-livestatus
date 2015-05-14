@@ -6,7 +6,8 @@ import re
 import socket
 import sqlite3
 from collections import namedtuple
-from multiprocessing import Process, Queue, Pipe
+from multiprocessing import Queue, Pipe
+from threading import Thread
 
 
 class LivestatusClient(object):
@@ -80,9 +81,7 @@ class LivestatusClient(object):
 
         for w in xrange(0,self.workers):
             parent_conn, child_conn = Pipe()
-            from threading import Thread
             p = Thread(target=monitor_worker, args=(mon_queue, child_conn))
-            #p = Process(target=monitor_worker, args=(mon_queue, child_conn))
             p.start()
             processes.append((p, parent_conn))
             mon_queue.put('STOP')
@@ -150,34 +149,23 @@ class MonitorNode(object):
             result (str)
         '''
         try:
-            s = socket.create_connection((self.ip, self.port), 3)
-            s.send(query)
-            s.shutdown(socket.SHUT_WR)
-            headers = s.recv(16)
+            s = SocketHelper(self.ip, self.port, 3)
         except socket.error:
             msg = 'Could not connect to {}:{}'.format(self.ip, self.port)
             raise MonitorNodeError(msg)
         try:
+            s.send_all(query)
+            headers = s.recv_all(16)
             if len(headers) != 16 or re.match('\d\d\d\s*\d+\s*\n', headers) is None:
                 raise ValueError
             status = int(headers.split()[0])
             length = int(headers.split()[1])
-        except (IndexError, ValueError):
+        except (socket.error, IndexError, ValueError):
             msg = '{} did not return a proper response header'.format(self.name)
             raise MonitorNodeError(msg)
 
         try:
-            data = ''
-            bytes_remaining = length
-            BUFFER = 4096
-            while bytes_remaining > 0:
-                if bytes_remaining < BUFFER:
-                    received = s.recv(bytes_remaining)
-                else:
-                    received = s.recv(BUFFER)
-                bytes_remaining -= len(received)
-                data += received
-            s.close()
+           data = s.recv_all(length)
         except socket.error:
             msg = 'Lost connection with {} while receiving data'.format(self.name)
             raise MonitorNodeError(msg)
@@ -472,6 +460,49 @@ class QueryResultSet(object):
             self.results[monitor]['data'] = other.results[monitor]['data']
             self.results[monitor]['error'] = other.results[monitor]['error']
         return self
+
+
+class SocketHelper(object):
+    '''A very simple wrapper around the socket class to provide some
+    convenience methods and error-handling'''
+
+    CHUNK_SIZE = 1024
+
+    def __init__(self, host, port, timeout=5):
+        self.host = host
+        self.port = port
+        self.timeout = timeout
+        self.socket = socket.create_connection(
+                (self.host, self.port), self.timeout)
+
+    def send_all(self, data, close=True):
+        '''Blocks until all data is sent to the socket and closes the socket
+        for sending afterwards if close is set to True'''
+        self.socket.sendall(data)
+        if close:
+            self.socket.shutdown(socket.SHUT_WR)
+
+    def recv_all(self, msg_len, close=False):
+        '''Blocks until <msg_len> number of bytes have been received from the
+        socket or raises an exception if the connection times out, closing the
+        socket afterwards if close is True'''
+        remaining = msg_len
+        chunks = []
+        start = time.time()
+        failed = False
+        while remaining > 0:
+            size = min(remaining, self.CHUNK_SIZE)
+            received = self.socket.recv(size)
+            chunks.append(received)
+            remaining -= len(received)
+            if time.time() - start > self.timeout:
+                failed = True
+                break
+        if close:
+            self.socket.close()
+        if failed:
+            raise socket.error
+        return ''.join(chunks)
 
 
 def monitor_worker(mon_queue, conn):
