@@ -80,7 +80,9 @@ class LivestatusClient(object):
 
         for w in xrange(0,self.workers):
             parent_conn, child_conn = Pipe()
-            p = Process(target=monitor_worker, args=(mon_queue, child_conn))
+            from threading import Thread
+            p = Thread(target=monitor_worker, args=(mon_queue, child_conn))
+            #p = Process(target=monitor_worker, args=(mon_queue, child_conn))
             p.start()
             processes.append((p, parent_conn))
             mon_queue.put('STOP')
